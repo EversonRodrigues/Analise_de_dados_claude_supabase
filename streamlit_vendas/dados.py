@@ -41,6 +41,22 @@ def _ler_env() -> dict[str, str]:
             chave, _, valor = linha.partition("=")
             valores[chave.strip()] = valor.strip().strip('"').strip("'")
     valores.update({k: v for k, v in os.environ.items() if k in valores or "SUPABASE" in k})
+
+    # Streamlit Community Cloud nao tem .env: o repositorio ignora *.env, entao
+    # la as credenciais vem de st.secrets (Settings > Secrets no painel do app).
+    # Fica por ultimo de proposito — no deploy e a unica fonte; localmente o
+    # .env.local continua valendo porque secrets nao existe.
+    try:
+        import streamlit as st
+
+        for chave, valor in st.secrets.items():
+            if isinstance(valor, str) and "SUPABASE" in chave:
+                valores.setdefault(chave, valor)
+    except Exception:
+        # Sem streamlit no contexto (teste unitario, script) ou sem secrets
+        # configurado: seguimos so com .env e variaveis de ambiente.
+        pass
+
     return valores
 
 
@@ -56,9 +72,11 @@ def credenciais() -> tuple[str, str]:
     )
     if not url or not chave:
         raise RuntimeError(
-            "Credenciais do Supabase nao encontradas. Esperado NEXT_PUBLIC_SUPABASE_URL e "
-            "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY em .env.local (ou SUPABASE_URL / "
-            "SUPABASE_ANON_KEY em .env), na raiz do projeto."
+            "Credenciais do Supabase nao encontradas.\n"
+            "  Local: NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY "
+            "em .env.local (ou SUPABASE_URL / SUPABASE_ANON_KEY em .env) na raiz do projeto.\n"
+            "  Streamlit Cloud: as mesmas duas chaves em Settings > Secrets do app — "
+            "o repositorio ignora *.env, entao nao ha .env no deploy."
         )
     return url.rstrip("/"), chave
 
