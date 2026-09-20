@@ -333,4 +333,5 @@ tipos sem checá-los, então uma suíte verde sozinha não dizia nada sobre o `t
 | [`docs/03-kpis-pricing.md`](docs/03-kpis-pricing.md) | KPIs de Pricing & Margem |
 | [`docs/04-kpis-clientes.md`](docs/04-kpis-clientes.md) | KPIs de Clientes & Comportamento |
 | [`docs/05-qa-e-seguranca.md`](docs/05-qa-e-seguranca.md) | QA, segurança e limitações dos dados |
+| [`docs/06-guia-do-banco-e-do-negocio.md`](docs/06-guia-do-banco-e-do-negocio.md) | **Transferência de conhecimento**: esquema, armadilhas, fórmulas e achados de negócio para reusar a base em outro projeto |
 | [`CONTRATO.md`](CONTRATO.md) | Contrato de design e propriedade de arquivos |
