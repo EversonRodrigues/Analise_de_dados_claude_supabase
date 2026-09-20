@@ -42,22 +42,56 @@ def _ler_env() -> dict[str, str]:
             valores[chave.strip()] = valor.strip().strip('"').strip("'")
     valores.update({k: v for k, v in os.environ.items() if k in valores or "SUPABASE" in k})
 
-    # Streamlit Community Cloud nao tem .env: o repositorio ignora *.env, entao
-    # la as credenciais vem de st.secrets (Settings > Secrets no painel do app).
-    # Fica por ultimo de proposito — no deploy e a unica fonte; localmente o
-    # .env.local continua valendo porque secrets nao existe.
+    valores.update(_ler_secrets())
+    return valores
+
+
+# Preenchido por _ler_secrets() para a mensagem de erro conseguir dizer o que
+# realmente encontrou. Guarda so NOMES de chave, nunca valores.
+_DIAGNOSTICO: dict[str, Any] = {"secrets": "nao consultado", "chaves": []}
+
+
+def _ler_secrets() -> dict[str, str]:
+    """
+    Le st.secrets — a unica fonte de credenciais no Streamlit Community Cloud,
+    porque o repositorio ignora *.env e nao ha .env no deploy.
+
+    Aceita tanto chaves no nivel raiz quanto dentro de uma secao TOML, porque
+    as duas formas sao naturais de colar no painel:
+
+        NEXT_PUBLIC_SUPABASE_URL = "https://..."     # raiz
+
+        [supabase]                                    # secao
+        NEXT_PUBLIC_SUPABASE_URL = "https://..."
+    """
+    achados: dict[str, str] = {}
     try:
         import streamlit as st
 
-        for chave, valor in st.secrets.items():
-            if isinstance(valor, str) and "SUPABASE" in chave:
-                valores.setdefault(chave, valor)
-    except Exception:
-        # Sem streamlit no contexto (teste unitario, script) ou sem secrets
-        # configurado: seguimos so com .env e variaveis de ambiente.
-        pass
+        itens = list(st.secrets.items())
+    except Exception as erro:
+        _DIAGNOSTICO["secrets"] = f"indisponivel ({type(erro).__name__})"
+        return achados
 
-    return valores
+    vistas: list[str] = []
+    for chave, valor in itens:
+        if isinstance(valor, str):
+            vistas.append(chave)
+            achados[chave] = valor
+        else:
+            # Secao TOML: achata um nivel, prefixando nada — as chaves internas
+            # e que interessam.
+            try:
+                for sub, subvalor in valor.items():
+                    if isinstance(subvalor, str):
+                        vistas.append(f"{chave}.{sub}")
+                        achados.setdefault(sub, subvalor)
+            except Exception:
+                continue
+
+    _DIAGNOSTICO["secrets"] = "ok" if vistas else "vazio"
+    _DIAGNOSTICO["chaves"] = vistas
+    return achados
 
 
 def credenciais() -> tuple[str, str]:
@@ -72,11 +106,18 @@ def credenciais() -> tuple[str, str]:
     )
     if not url or not chave:
         raise RuntimeError(
-            "Credenciais do Supabase nao encontradas.\n"
-            "  Local: NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY "
-            "em .env.local (ou SUPABASE_URL / SUPABASE_ANON_KEY em .env) na raiz do projeto.\n"
-            "  Streamlit Cloud: as mesmas duas chaves em Settings > Secrets do app — "
-            "o repositorio ignora *.env, entao nao ha .env no deploy."
+            "Credenciais do Supabase nao encontradas.\n\n"
+            f"st.secrets: {_DIAGNOSTICO['secrets']}\n"
+            f"chaves visiveis em st.secrets: {_DIAGNOSTICO['chaves'] or 'nenhuma'}\n"
+            f"URL encontrada: {'sim' if url else 'NAO'} | "
+            f"chave encontrada: {'sim' if chave else 'NAO'}\n\n"
+            "Esperado (as duas, no nivel raiz do secrets):\n"
+            '  NEXT_PUBLIC_SUPABASE_URL = "https://<ref>.supabase.co"\n'
+            '  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_..."\n\n'
+            "Local: as mesmas duas em .env.local na raiz do projeto.\n"
+            "Streamlit Cloud: Manage app > Settings > Secrets — o repositorio "
+            "ignora *.env, entao nao existe .env no deploy. Depois de salvar, o "
+            "app reinicia sozinho; se nao reiniciar, use Reboot."
         )
     return url.rstrip("/"), chave
 
