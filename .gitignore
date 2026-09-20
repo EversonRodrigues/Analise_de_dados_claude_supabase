@@ -12,3 +12,16 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+node_modules
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+.DS_Store
+.vercel
+/tmp/
+*.log
+
+# Artefatos de depuracao do Playwright MCP (screenshots publicados em docs/screenshots/)
+.playwright-mcp/
